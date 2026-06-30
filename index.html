@@ -1441,9 +1441,9 @@ window.setBeckerMapMode = function(on) {
 <div id="panel-temps" class="panel">
   <div class="section-hd"><h2>Temperature Arc</h2></div>
   <div class="summary-row">
-    <div class="sum-card"><div class="sum-lbl">Hottest point</div><div class="sum-val">91°F</div><div class="sum-sub">Charlotte departure (July avg)</div></div>
-    <div class="sum-card"><div class="sum-lbl">Coldest point</div><div class="sum-val">~48°F</div><div class="sum-sub">Dawes Glacier 6:30 AM</div></div>
-    <div class="sum-card"><div class="sum-lbl">Temp swing</div><div class="sum-val">~43°F</div><div class="sum-sub">Charlotte → Glacier</div></div>
+    <div class="sum-card"><div class="sum-lbl">Hottest point</div><div class="sum-val" id="stat-hottest">—</div><div class="sum-sub" id="stat-hottest-sub"></div></div>
+    <div class="sum-card"><div class="sum-lbl">Coldest point</div><div class="sum-val" id="stat-coldest">—</div><div class="sum-sub" id="stat-coldest-sub"></div></div>
+    <div class="sum-card"><div class="sum-lbl">Temp swing</div><div class="sum-val" id="stat-swing">—</div><div class="sum-sub" id="stat-swing-sub"></div></div>
     <div class="sum-card"><div class="sum-lbl">Port days</div><div class="sum-val">4</div><div class="sum-sub">Sitka, Juneau, Icy Strait, Ketchikan</div></div>
   </div>
   <p class="group-label">Temperature by stop — daytime highs (°F)</p>
@@ -2312,10 +2312,13 @@ function buildInsight() {
   if (!box) return;
   const wC    = WEATHER.charlotte_dep;
   const wG    = WEATHER.glacier;
-  const swing = wC.temp - wG.temp;
+  // Use actual hottest temp across all weather keys, not just Charlotte
+  const allTemps = Object.values(WEATHER).map(w => w.temp);
+  const hottestTemp = Math.max(...allTemps);
+  const swing = hottestTemp - wG.temp;
   const ports = [WEATHER.sitka, WEATHER.juneau, WEATHER.icy_strait, WEATHER.ketchikan];
   const avgRain = Math.round(ports.reduce((s, w) => s + w.rain, 0) / ports.length);
-  box.innerHTML = `<strong>Key packing insight:</strong> You'll experience a <strong>~${swing}°F swing</strong> — from ${wC.temp}°F in Charlotte to ~${wG.temp}°F at the Dawes Glacier at 6:30 AM on July 8. The smartest strategy is <em>packable layers</em>: thermal base → fleece mid-layer → waterproof shell. ${avgRain >= 45 ? `Port rain chances are averaging <strong>${avgRain}%</strong> — waterproofing is non-negotiable regardless of the forecast.` : `Pack rain gear regardless — Southeast Alaska averages rain 200+ days a year.`}`;
+  box.innerHTML = `<strong>Key packing insight:</strong> You'll experience a <strong>~${swing}°F swing</strong> — from ${hottestTemp}°F in Charlotte to ~${wG.temp}°F at the Dawes Glacier at 6:30 AM on July 8. The smartest strategy is <em>packable layers</em>: thermal base → fleece mid-layer → waterproof shell. ${avgRain >= 45 ? `Port rain chances are averaging <strong>${avgRain}%</strong> — waterproofing is non-negotiable regardless of the forecast.` : `Pack rain gear regardless — Southeast Alaska averages rain 200+ days a year.`}`;
 }
 
 /* Returns a small badge indicating forecast source and confidence.
@@ -2442,6 +2445,23 @@ function buildTempArc() {
       <div class="arc-temp">${w.temp}°F</div>
     </div>`;
   }).join('');
+
+  // Dynamically compute stat cards from WEATHER data
+  let hottestVal = -Infinity, coldestVal = Infinity;
+  let hottestKey = '', coldestKey = '';
+  stops.forEach(s => {
+    const w = WEATHER[s.key];
+    if (!w) return;
+    if (w.temp > hottestVal) { hottestVal = w.temp; hottestKey = s.loc; }
+    if (w.temp < coldestVal) { coldestVal = w.temp; coldestKey = s.loc; }
+  });
+  const swing = hottestVal - coldestVal;
+  document.getElementById('stat-hottest').textContent = hottestVal + '°F';
+  document.getElementById('stat-hottest-sub').textContent = hottestKey;
+  document.getElementById('stat-coldest').textContent = coldestVal + '°F';
+  document.getElementById('stat-coldest-sub').textContent = coldestKey;
+  document.getElementById('stat-swing').textContent = '~' + swing + '°F';
+  document.getElementById('stat-swing-sub').textContent = hottestKey.split(' (')[0] + ' → ' + coldestKey.split(' (')[0];
 }
 
 function secQtyTotals(sec, si, saved) {
